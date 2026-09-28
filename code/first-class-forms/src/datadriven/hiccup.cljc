@@ -15,7 +15,8 @@
   `expand` when you only want the aliases expanded (on the server, or in
   tests)."
   (:require [clojure.walk :as walk]
-            [re-frame.core :as rf]))
+            [re-frame.core :as rf]
+            #?(:cljs [reagent.core :as r])))
 
 ;;; Placeholders
 ;;
@@ -70,7 +71,12 @@
                    [actions] ;; A single action, like [:tic 0 1]
                    actions)]
      (doseq [action (interpolate dom-event (remove nil? actions))]
-       (execute-action! dom-event action opts)))))
+       (execute-action! dom-event action opts))
+     ;; Reagent normally re-renders on the next animation frame. After
+     ;; typing, render right away, so that an Enter pressed immediately
+     ;; after (or an autofilled field) submits handlers built from the
+     ;; latest app-db.
+     #?(:cljs (when (:sync? opts) (r/flush))))))
 
 ;;; Aliases
 

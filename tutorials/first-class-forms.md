@@ -871,11 +871,11 @@ Now the error messages disappear as soon as you fix what they complain about.
 
 ![The edit form showing two validation errors](images/first-class-forms/validation.png)
 
-These fields are not controlled (they have no `:value`), so the input events
-can be dispatched the normal, asynchronous way. The browser owns the text, and
-nothing is lost if a render happens before the validation has run. The
-`sync-controlled-inputs` function from the [previous tutorial](./forms.md#controlled-inputs-and-asynchronous-events)
-leaves them alone.
+These fields aren't controlled (they have no `:value`), so the browser owns
+the text, and the validation event only reads it. Like all `:input`
+actions, `:form/validate` is dispatched synchronously (see
+[the previous tutorial](./forms.md#controlled-inputs-and-asynchronous-events)).
+It returns more actions through `:fx`, and those are queued as usual.
 
 ## Testing
 

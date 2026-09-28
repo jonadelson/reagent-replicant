@@ -214,6 +214,10 @@ Form fields need two extra things to work well in React:
 - Actions for `:input` and `:change` events use `rf/dispatch-sync` instead of
   `rf/dispatch`. The event is handled right away, so app-db has the new text
   before React draws the field again, and fast typists don't lose characters.
+  Right after, `prepare` asks Reagent to re-render immediately (`r/flush`)
+  instead of on the next animation frame. Otherwise an Enter pressed right
+  after typing (or after the browser autofills a field) would run a submit
+  handler built from the text as it was one keystroke earlier.
 
 So the Replicant style works as is:
 

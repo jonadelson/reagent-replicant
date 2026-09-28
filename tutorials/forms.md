@@ -558,112 +558,50 @@ task is added:
       "Add"]]))
 ```
 
-In the original, that's the end of the story. In React and re-frame, there's
-one more thing to take care of.
+That's it: the form now clears after each new task.
 
 ### Controlled inputs and asynchronous events
 
-Type something quickly into the field and some characters go missing. Type
-slowly in the middle of the text, and the cursor jumps to the end after
-every character. (The console also has a React warning about the `value`
-being `null`, which we'll get rid of in passing.) Here's why.
+Controlled inputs deserve a closer look, because this is where React and
+re-frame behave differently from Replicant.
 
 Replicant runs the actions and renders the page again right away, while the
-browser is still handling the keystroke. The field and app-db never disagree.
-re-frame and Reagent work differently:
+browser is still handling the keystroke, so the field and app-db never
+disagree. re-frame and Reagent normally take their time: `rf/dispatch` puts
+the event in a queue that re-frame works through shortly after, and Reagent
+re-renders on the browser's next animation frame. Meanwhile, React insists
+that a controlled input shows its `:value`. If the field is rendered before
+the keystroke has reached app-db, React puts the old text back. Typing fast
+then loses characters, and typing in the middle of the text makes the cursor
+jump to the end.
 
-1. `rf/dispatch` puts the event in a queue, and re-frame handles it shortly
-   after.
-2. Reagent re-renders on the browser's next animation frame.
+`datadriven.hiccup` takes care of this for you, in two ways:
 
-Meanwhile, React insists that a controlled input shows its `:value`. Right
-after the input event, before re-frame has even seen it, React puts the old
-text back. When the new text finally arrives, it's written into the field
-from the outside, which moves the cursor to the end. And if you type the
-next character before that happens, it's typed into the old text, and the
-previous one is lost.
+- Actions for `:input` and `:change` events are dispatched with
+  `rf/dispatch-sync`, which handles the event immediately instead of
+  queueing it. re-frame's own documentation names "the `:on-change` handler
+  of a text field where we are expecting fast typing" as one of the few good
+  reasons to use it. Other events, like clicks and submits, still go through
+  the queue.
+- On form fields, `:on {:input ...}` becomes React's `:on-change`, not
+  `:on-input`. In the DOM, a text field's `change` event only fires when you
+  leave the field, but React's `onChange` fires on every keystroke, just like
+  `input`. It's also what Reagent's safety net for controlled inputs is built
+  around: it keeps the text and the cursor in place, and turns a `nil` value
+  into an empty string.
+- After those synchronous events, it calls Reagent's `r/flush`, which renders
+  right away instead of on the next animation frame. Otherwise app-db would
+  be up to date, but the page could still be one keystroke behind. That
+  matters here: the form's submit handler holds the `text` from the last
+  render, and pressing Enter right after typing could add the task without
+  its last letter.
 
-Reagent has a safety net for controlled inputs that keeps the text and the
-cursor in place, and also turns a `nil` value into an empty string. But it
-only works for `:on-change` handlers, and only if they update the state right
-away.
-
-re-frame's documentation for `dispatch-sync` names exactly this case as one
-of the few where you should use it: "the `:on-change` handler of a text field
-where we are expecting fast typing". `dispatch-sync` handles the event
-immediately instead of queueing it. Our views don't call re-frame themselves,
-so we teach the glue code in `core.cljs` to do it for them. It looks for
-controlled inputs (an `:input` or `:textarea` with both a `:value` and an
-`:input` handler), and gives them a handler that dispatches synchronously:
-
-```clojure
-;; src/toil/core.cljs
-(ns toil.core
-  (:require [clojure.walk :as walk]
-            [datadriven.hiccup :as hiccup]
-            [re-frame.core :as rf]
-            [reagent.core :as r]
-            [reagent.dom.client :as rdc]
-            [toil.task :as task]
-            [toil.ui :as ui]))
-
-,,,
-
-(defn- controlled-input? [node]
-  (and (vector? node)
-       (keyword? (first node))
-       (re-find #"^(input|textarea)([.#]|$)" (name (first node)))
-       (map? (second node))
-       (contains? (second node) :value)
-       (some? (get-in (second node) [:on :input]))))
-
-(defn- dispatch-sync-actions [e actions]
-  (let [actions (if (keyword? (first actions)) [actions] actions)]
-    (doseq [action (hiccup/interpolate e (remove nil? actions))]
-      (rf/dispatch-sync action)))
-  (r/flush))
-
-(defn sync-controlled-inputs
-  "Makes the :input handler of every controlled input synchronous. Reagent
-  only protects the caret of a controlled input for :on-change, so that is
-  where the handler goes (React fires onChange on every keystroke)."
-  [hiccup]
-  (walk/prewalk
-   (fn [node]
-     (if (controlled-input? node)
-       (let [actions (get-in node [1 :on :input])]
-         (-> node
-             (update-in [1 :on] dissoc :input)
-             (assoc-in [1 :on :change] #(dispatch-sync-actions % actions))))
-       node))
-   hiccup))
-
-;; Rendering
-
-(defn app []
-  (-> (ui/render-page @(rf/subscribe [:app/db]))
-      sync-controlled-inputs
-      hiccup/prepare))
-```
-
-A few details:
-
-- `hiccup/interpolate` is the function `datadriven.hiccup` uses to fill in
-  placeholders, so `:event/target.value` works as before.
-- In the DOM, the `change` event of a text field only fires when you leave
-  the field. React's `onChange` is different: it fires on every keystroke, and
-  it's the one Reagent's safety net is built around.
-- `r/flush` makes Reagent render right away instead of on the next animation
-  frame. Without it, app-db would be up to date, but the page (including the
-  form's submit handler, which holds the `text` from the last render) could
-  be one keystroke behind. Type fast enough and hit Enter, and the task would
-  be added without its last letter.
-
-The view doesn't change at all: it still says what should happen on input,
-as data. If you use this approach in your own app, this function belongs in
-your copy of `datadriven.hiccup`, which is meant to be adapted to your needs.
-
-Now the form clears nicely after each new task.
+So the view can stay exactly as the original writes it, and the event handler
+remains plain data. If you write your own event handlers in Reagent (as
+functions), remember the combination: `:on-change` plus `rf/dispatch-sync`
+for controlled text fields. Together, these three tricks give the input
+events Replicant's behavior: state changes and rendering happen before the
+browser moves on.
 
 ![The practice log with three tasks, one completed](images/forms/practice-log.png)
 
@@ -721,9 +659,10 @@ instead.
 - **`:replicant/key` is `:key`**, and the list items have keys too, since new
   tasks are inserted at the top.
 - **`:replicant/mounting`** is replaced by CSS `@starting-style`.
-- **Controlled inputs** need synchronous event handling in re-frame. The
-  `sync-controlled-inputs` function in `core.cljs` provides it, using
-  `rf/dispatch-sync` as re-frame's docs recommend.
+- **Controlled inputs** need synchronous event handling in re-frame.
+  `datadriven.hiccup` dispatches `:input` and `:change` actions with
+  `rf/dispatch-sync`, as re-frame's docs recommend, renders right away with
+  `r/flush`, and turns `:input` on form fields into React's `:on-change`.
 - The `aria-label`s on the task buttons are the right way around (the
   original has them swapped).
 - The code has tests, and uses Tailwind 3 and daisyUI 4 like the original
