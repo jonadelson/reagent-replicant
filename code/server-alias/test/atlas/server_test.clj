@@ -28,6 +28,14 @@
                                   ::map/center [-0.1276 51.5072]
                                   ::map/zoom 12})}]])))
 
+  (testing "Ignores nil children"
+    (is (= (-> (hiccup/expand
+                [::map/marker-map {}
+                 nil
+                 (list [::map/marker {:point/label "Eevee"}] nil)])
+               (get-in [2 1 :innerHTML]))
+           (pr-str {::map/points [{:point/label "Eevee"}]}))))
+
   (testing "The client can read the data back"
     (let [html (html/render (server/render-city-page "london"))
           edn-str (second (re-find #"<script type=\"application/edn\">(.*?)</script>" html))]

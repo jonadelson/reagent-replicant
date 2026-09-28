@@ -286,25 +286,24 @@ Then we store the text in app-db as the user types:
  {:type "text"
   :placeholder "New todo"
   :value (or (::todo-title state) "")
-  :on {:change [[:store/assoc-in [::todo-title] :event/target.value]]}}]
+  :on {:input [[:store/assoc-in [::todo-title] :event/target.value]]}}]
 ```
 
-Two details here differ from the Replicant version, both because of React:
+This is the same code as in the Replicant version, except for
+`(or ,,, "")`. Two React details are at play here:
 
-- **The event is `:change`, not `:input`.** React's `onChange` fires on every
-  keystroke, just like the DOM's `input` event. When an input has a `:value`
-  and an `:on-change` handler, Reagent keeps the text field in sync with
-  app-db even though re-frame updates app-db a moment *after* the keystroke.
-  With `:on-input`, React resets the field to the old value after every
-  keystroke, and the cursor jumps to the end whenever you type in the middle
-  of the text. (Reagent's workaround isn't perfect either: extremely fast
-  input, like a test robot typing a character every few milliseconds, can
-  still lose characters. Human typing is fine.)
+- **`:input` becomes React's `onChange`.** On form fields,
+  `datadriven.hiccup` turns `:on {:input ...}` into an `:on-change` handler.
+  (React's `onChange` fires on every keystroke, just like the DOM's `input`
+  event.) With a `:value` and an `:on-change`, Reagent's input wrapper keeps
+  the cursor where it is while app-db catches up, and the adapter dispatches
+  these actions right away (with `dispatch-sync`), so fast typing doesn't lose
+  characters. See [Placeholders](../guides/data-driven-reagent.md#placeholders)
+  in the guide.
 - **The value is never `nil`.** `(::todo-title state)` is `nil` until the
-  user types. In React, an input with a `nil` value is *uncontrolled* (React
-  leaves its content alone), and React warns when it later gets a real value
-  and becomes controlled. Reagent's input wrapper happens to smooth this over
-  for inputs with `:on-change`, but `(or ,,, "")` makes the intent explicit.
+  user types. In React, an input with a `nil` value is *uncontrolled*, and
+  React warns when it later becomes controlled. Reagent smooths this over for
+  inputs with a change handler, but `(or ,,, "")` makes the intent explicit.
 
 Next we need to issue a command with the title. A first version could put a
 click handler on the button. It's only there when there is a title, and on
@@ -352,7 +351,7 @@ version, with a submit button and the handler on the form:
      {:type "text"
       :placeholder "New todo"
       :value (or (::todo-title state) "")
-      :on {:change [[:store/assoc-in [::todo-title] :event/target.value]]}}]
+      :on {:input [[:store/assoc-in [::todo-title] :event/target.value]]}}]
     [:button.btn.btn-primary {:type "submit"}
      "Save todo"]]
    ,,,])
@@ -381,11 +380,11 @@ The complete code is in [`code/network-writes`](../code/network-writes/).
   `:success?` first.
 - **The form uses `:submit` and `[:event/prevent-default]`**, the "better
   version" the original suggests, so Enter works and doesn't reload the page.
-- **The text field uses `:change` instead of `:input`, and its value is
-  never `nil`**, to fit how React handles controlled inputs.
+- **The text field's value is never `nil`** (`(or ,,, "")`), to fit how
+  React handles controlled inputs.
 - **The backend's `toggle-todo` keeps the todos in a vector** (`mapv` instead
   of `for`), so new todos are always added at the end of the list. In the
   original, toggling turns the vector into a list, and later todos are added
   at the front.
-- **Aliases take classes through `:class`**, and the backend reads commands
-  with `clojure.edn/read-string`, as in the earlier parts.
+- **The backend reads commands with `clojure.edn/read-string`**, as in the
+  earlier parts.

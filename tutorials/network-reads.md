@@ -685,8 +685,8 @@ Start with a new namespace for the page:
 
 `:ui/a` is the routing alias from the setup. It takes a location instead of a
 URL, and uses the routes (passed to it through `::hiccup/alias-data`) to fill
-in the `href`. The Replicant version writes `[:ui/a.link ,,,]`;
-`datadriven.hiccup` doesn't read classes from alias tags, so we use `:class`.
+in the `href`. As with ordinary elements, `.link` in the tag adds a class,
+here the `link` class, which the alias passes on to the `<a>` it renders.
 
 Add the page to the list in `toil.core`:
 
@@ -826,8 +826,6 @@ The complete code is in [`code/network-reads`](../code/network-reads/).
   actions.
 - **The routes are a top-level `def`** built from the pages, rather than a
   local in `main`.
-- **Aliases take classes through `:class`** (`[:ui/a {:class "link" ,,,}]`
-  instead of `[:ui/a.link ,,,]`).
 - **The frontpage route is `[[]]` instead of `[]`**, so it only matches `/`.
   With `[]`, silk matches every URL.
 - **The backend serves `index.html` for page URLs**, so reloading

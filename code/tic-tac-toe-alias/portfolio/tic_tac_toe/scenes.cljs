@@ -28,11 +28,11 @@
    @store])
 
 (defscene dimmed-cell
-  [::ui/cell {:class :cell-dim}
+  [::ui/cell.cell-dim
    ui/mark-o])
 
 (defscene highlighted-cell
-  [::ui/cell {:class :cell-highlight}
+  [::ui/cell.cell-highlight
    ui/mark-o])
 
 (defscene empty-board

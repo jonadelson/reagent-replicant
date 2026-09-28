@@ -22,7 +22,7 @@
      {:type "text"
       :placeholder "New todo"
       :value (or (::todo-title state) "")
-      :on {:change [[:store/assoc-in [::todo-title] :event/target.value]]}}]
+      :on {:input [[:store/assoc-in [::todo-title] :event/target.value]]}}]
     [:button.btn.btn-primary {:type "submit"}
      "Save todo"]]
    (when-let [todos (query/get-result state items-query)]
