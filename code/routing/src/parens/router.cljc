@@ -5,7 +5,7 @@
 (def routes
   (silk/routes
    [[:pages/episode [["episodes" :episode/id]]]
-    [:pages/frontpage []]]))
+    [:pages/frontpage [[]]]]))
 
 (defn url->location [routes url]
   (let [uri (cond-> url (string? url) uri/uri)]

@@ -16,7 +16,7 @@
        :name "name"
        :value text
        :placeholder "What do you need to practice?"
-       :on {:change [:store/assoc-in [:new-task :task/name] :event/target.value]}}]
+       :on {:input [:store/assoc-in [:new-task :task/name] :event/target.value]}}]
      [:button.btn.btn-primary
       (cond-> {:type "submit"}
         (empty? text) (assoc :disabled "disabled"))

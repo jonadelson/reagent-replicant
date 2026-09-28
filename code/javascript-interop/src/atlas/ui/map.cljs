@@ -15,8 +15,7 @@
 
 (defn map-component [_data]
   (let [!node (atom nil)
-        !map (atom nil)
-        set-node! (fn [node] (reset! !node node))]
+        !map (atom nil)]
     (r/create-class
      {:display-name "atlas.ui.map/map-component"
 
@@ -34,7 +33,7 @@
 
       :reagent-render
       (fn [_data]
-        [:div.aspect-video.mb-4 {:ref set-node!}])})))
+        [:div.aspect-video.mb-4 {:ref #(reset! !node %)}])})))
 
 (defn render-map [data]
   [map-component data])

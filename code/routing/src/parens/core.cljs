@@ -72,7 +72,7 @@
   (rf/dispatch-sync [:app/initialize state])
   (rf/dispatch-sync [:location/changed (get-current-location)])
 
-  (js/document.body.addEventListener "click" route-click)
+  (js/document.body.addEventListener "click" #(route-click %))
 
   (js/window.addEventListener
    "popstate"

@@ -1,0 +1,12 @@
+/* Look for class names in the ClojureScript code in src */
+@import "tailwindcss" source("../src");
+
+@plugin "daisyui" {
+  themes: cupcake --default;
+}
+
+@layer components {
+  .max-w-screen-lg {
+    @apply max-w-(--breakpoint-lg);
+  }
+}
