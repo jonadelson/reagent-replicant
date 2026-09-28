@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {}
+
+@layer components {
+    .link {
+        @apply underline text-blue-700 cursor-pointer;
+    }
+
+    .link:hover {
+        @apply no-underline;
+    }
+}
