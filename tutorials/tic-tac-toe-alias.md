@@ -73,8 +73,9 @@ public function, `prepare`, is used the same way, but it now also:
 
 - **Expands aliases.** `register-alias!` registers an alias globally, and
   `prepare` also takes an `:aliases` option for passing them in directly.
-  `expand` expands aliases and leaves everything else alone, which is handy in
-  tests. `:alias-data` hands extra data to every alias (the
+  `expand` expands aliases and leaves everything else alone, and `expand-1`
+  expands only one level of them. Both are handy in tests. Alias tags accept
+  the same `.class` and `#id` shorthand as other tags. `:alias-data` hands extra data to every alias (the
   [i18n tutorial](./i18n-alias.md) uses it).
 - **Drops namespaced attributes**, like `:tic-tac-toe.ui/dim?`, before
   Reagent sees them. We'll see why that matters in a moment.
@@ -159,18 +160,19 @@ every attribute a caller might want: a caller can add an id, a data attribute,
 an `aria-label` or another class, and it ends up on the button:
 
 ```clojure
-[::ui/cell {::ui/clickable? true
-            :class ["my-class"]
-            :data-cell-id "f6c"}
+[::ui/cell.my-class
+ {::ui/clickable? true
+  :data-cell-id "f6c"}
  ui/mark-x]
 ```
 
-Two differences from Replicant show up here. Replicant lets you put classes
-in an alias's tag, as in `[::ui/cell.my-class ...]`. Our adapter looks up the
-tag as it is written, so pass classes in `:class` instead. And Replicant
-always gives an alias its `:class` as a collection. Our adapter passes
-attributes on unchanged, so `(update :class conj ...)` above only works if
-the caller gives `:class` as a collection, or leaves it out.
+Like any other tag, an alias tag can carry classes (and an id): `.my-class`
+is removed from the tag before the alias is looked up, and the alias gets it
+in `:class`, as the vector `["my-class"]`. One difference from Replicant:
+Replicant always gives an alias its `:class` as a collection. Our adapter only
+does so when the tag has classes, and otherwise passes `:class` on as the
+caller wrote it. So `(update :class conj ...)` above works for a `:class`
+that is a collection or missing, but not for a string.
 
 Now look at what the options do. Each one maps to exactly one attribute:
 `::dim?` means "add the class `cell-dim`", `::on-click` means "set
@@ -231,16 +233,17 @@ updated scenes:
    @store])
 
 (defscene dimmed-cell
-  [::ui/cell {:class :cell-dim}
+  [::ui/cell.cell-dim
    ui/mark-o])
 
 (defscene highlighted-cell
-  [::ui/cell {:class :cell-highlight}
+  [::ui/cell.cell-highlight
    ui/mark-o])
 ```
 
-Scenes are now hiccup, not function calls. Reagent accepts keywords as class
-names, so `{:class :clickable}` works as well as `{:class "clickable"}`.
+Scenes are now hiccup, not function calls. Classes can go in the tag, as in
+`::ui/cell.cell-dim`, or in `:class`. Reagent accepts keywords as class names,
+so `{:class :clickable}` works as well as `{:class "clickable"}`.
 
 ### The board
 
@@ -447,59 +450,38 @@ including the cells, and then we're back to buttons, divs and SVGs:
    ,,,]]]
 ```
 
-Replicant has `expand-1` for this, which expands only one level of aliases.
-`datadriven.hiccup` doesn't, but `expand` takes the same `:aliases` option as
-`prepare`, and aliases passed that way win over registered ones. So in the
-test we can swap the cell alias for a stand-in that keeps the cell's
-attributes and content, and none of its markup:
+`hiccup/expand-1` is made for this case, just like Replicant's function of the
+same name: it expands the aliases it finds, but not the aliases in the hiccup
+they return. The board is expanded, and the cells inside it stay cells:
 
 ```clojure
-;; test/tic_tac_toe/ui_test.cljc
-(ns tic-tac-toe.ui-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [datadriven.hiccup :as hiccup]
-            [lookup.core :as lookup]
-            [tic-tac-toe.game :as game]
-            [tic-tac-toe.ui :as ui]))
-
-(defn stub-cell
-  "Stands in for the cell alias in tests: keeps the cell's attributes and
-  content, but none of its markup."
-  [attrs content]
-  (into [:cell attrs] content))
-
-(defn expand-game [game]
-  (hiccup/expand (ui/render-game game)
-                 {:aliases {::ui/cell stub-cell}}))
-```
-
-The stand-in uses a plain `:cell` tag. It must not be namespaced, or
-`expand` would try to expand it as an alias too. Here's what we get now:
-
-```clojure
-(expand-game
- {:size 3
-  :tics {[0 0] :x
-         [0 1] :o}
-  :next-player :x})
+(hiccup/expand-1
+ (ui/render-game
+  {:size 3
+   :tics {[0 0] :x
+          [0 1] :o}
+   :next-player :x}))
 
 ;;=>
 [:div {}
- [:div.board {}
-  [:div.row {}
-   [:cell {:class []} ui/mark-x]
-   [:cell {:class []} ui/mark-o]
-   [:cell {:class :clickable, :on {:click [:tic 0 2]}}]]
-  [:div.row {}
-   [:cell {:class :clickable, :on {:click [:tic 1 0]}}]
-   [:cell {:class :clickable, :on {:click [:tic 1 1]}}]
-   [:cell {:class :clickable, :on {:click [:tic 1 2]}}]]
-  [:div.row {}
-   [:cell {:class :clickable, :on {:click [:tic 2 0]}}]
-   [:cell {:class :clickable, :on {:click [:tic 2 1]}}]
-   [:cell {:class :clickable, :on {:click [:tic 2 2]}}]]]
+ [:div.board
+  ([:div.row
+    ([::ui/cell {:class []} ui/mark-x]
+     [::ui/cell {:class []} ui/mark-o]
+     [::ui/cell {:class :clickable, :on {:click [:tic 0 2]}}])]
+   [:div.row
+    ([::ui/cell {:class :clickable, :on {:click [:tic 1 0]}}]
+     [::ui/cell {:class :clickable, :on {:click [:tic 1 1]}}]
+     [::ui/cell {:class :clickable, :on {:click [:tic 1 2]}}])]
+   [:div.row
+    ([::ui/cell {:class :clickable, :on {:click [:tic 2 0]}}]
+     [::ui/cell {:class :clickable, :on {:click [:tic 2 1]}}]
+     [::ui/cell {:class :clickable, :on {:click [:tic 2 2]}}])])]
  nil]
 ```
+
+(The hiccup the board returns is left exactly as the alias wrote it, lists
+from `for` included.)
 
 That's the level of detail we want: which cells hold which marks, which are
 clickable, and what clicking them does. It would be even better if the test
@@ -519,8 +501,19 @@ CSS selectors. Add it to `deps.edn`:
 `lookup/select-one` returns the first element matching a selector, and
 `lookup/select` returns all of them. Both *normalize* the hiccup they return:
 classes in the tag and in `:class` are combined into one set of strings, and
-empty attributes are dropped. That makes the expected values in tests
-predictable, however the markup happened to write its classes.
+empty attributes are dropped, and lists are spliced into their parent. That
+makes the expected values in tests predictable, however the markup happened to
+be written. The test namespace needs these requires:
+
+```clojure
+;; test/tic_tac_toe/ui_test.cljc
+(ns tic-tac-toe.ui-test
+  (:require [clojure.test :refer [deftest is testing]]
+            [datadriven.hiccup :as hiccup]
+            [lookup.core :as lookup]
+            [tic-tac-toe.game :as game]
+            [tic-tac-toe.ui :as ui]))
+```
 
 Here's the first test:
 
@@ -528,25 +521,26 @@ Here's the first test:
 ;; test/tic_tac_toe/ui_test.cljc
 (deftest render-game-test
   (testing "Renders board"
-    (is (= (->> (expand-game
+    (is (= (->> (ui/render-game
                  {:size 3
                   :tics {[0 0] :x
                          [0 1] :o}
                   :next-player :x})
+                hiccup/expand-1
                 (lookup/select-one :div.board))
            [:div {:class #{"board"}}
             [:div {:class #{"row"}}
-             [:cell ui/mark-x]
-             [:cell ui/mark-o]
-             [:cell {:on {:click [:tic 0 2]}, :class #{"clickable"}}]]
+             [::ui/cell ui/mark-x]
+             [::ui/cell ui/mark-o]
+             [::ui/cell {:on {:click [:tic 0 2]}, :class #{"clickable"}}]]
             [:div {:class #{"row"}}
-             [:cell {:on {:click [:tic 1 0]}, :class #{"clickable"}}]
-             [:cell {:on {:click [:tic 1 1]}, :class #{"clickable"}}]
-             [:cell {:on {:click [:tic 1 2]}, :class #{"clickable"}}]]
+             [::ui/cell {:on {:click [:tic 1 0]}, :class #{"clickable"}}]
+             [::ui/cell {:on {:click [:tic 1 1]}, :class #{"clickable"}}]
+             [::ui/cell {:on {:click [:tic 1 2]}, :class #{"clickable"}}]]
             [:div {:class #{"row"}}
-             [:cell {:on {:click [:tic 2 0]}, :class #{"clickable"}}]
-             [:cell {:on {:click [:tic 2 1]}, :class #{"clickable"}}]
-             [:cell {:on {:click [:tic 2 2]}, :class #{"clickable"}}]]])))
+             [::ui/cell {:on {:click [:tic 2 0]}, :class #{"clickable"}}]
+             [::ui/cell {:on {:click [:tic 2 1]}, :class #{"clickable"}}]
+             [::ui/cell {:on {:click [:tic 2 2]}, :class #{"clickable"}}]]])))
 ```
 
 This test covers the whole board at once. You don't want many tests like it,
@@ -564,11 +558,12 @@ that the winning cells are highlighted:
                (game/tic 0 1) ;; x
                (game/tic 1 1) ;; o
                (game/tic 0 2) ;; x
-               expand-game
+               ui/render-game
+               hiccup/expand-1
                (->> (lookup/select '.cell-highlight)))
-           [[:cell {:class #{"cell-highlight"}} ui/mark-x]
-            [:cell {:class #{"cell-highlight"}} ui/mark-x]
-            [:cell {:class #{"cell-highlight"}} ui/mark-x]])))
+           [[::ui/cell {:class #{"cell-highlight"}} ui/mark-x]
+            [::ui/cell {:class #{"cell-highlight"}} ui/mark-x]
+            [::ui/cell {:class #{"cell-highlight"}} ui/mark-x]])))
 ```
 
 The expected value says nothing about *where* the three cells are. It doesn't
@@ -587,7 +582,8 @@ a test of its own, and counting is enough:
                (game/tic 0 1) ;; x
                (game/tic 1 1) ;; o
                (game/tic 0 2) ;; x
-               expand-game
+               ui/render-game
+               hiccup/expand-1
                (->> (lookup/select '.cell-dim))
                count)
            6)))
@@ -609,7 +605,8 @@ the same test with a different game and a different count:
                (game/tic 2 1) ;; x
                (game/tic 2 0) ;; o
                (game/tic 1 2) ;; x
-               expand-game
+               ui/render-game
+               hiccup/expand-1
                (->> (lookup/select '.cell-dim))
                count)
            9)))
@@ -617,8 +614,8 @@ the same test with a different game and a different count:
 
 The finished [`ui_test.cljc`](../code/tic-tac-toe-alias/test/tic_tac_toe/ui_test.cljc)
 also checks the "Start over" button, and tests the cell alias itself with
-plain `hiccup/expand`: that it passes its attributes on to the button, and
-wraps its content. Run the tests with `clojure -M:dev -m kaocha.runner`.
+plain `hiccup/expand`: that it passes its attributes (and classes from the
+tag) on to the button, and wraps its content. Run the tests with `clojure -M:dev -m kaocha.runner`.
 
 ## Conclusion
 
@@ -678,12 +675,10 @@ yourself, but keeping them apart tends to give you more control.
   and hiccup uses the keyword: `[::ui/cell ...]`.
 - **Alias functions always get two arguments**, attributes and children.
   Replicant's `defalias` lets you leave the second one out.
-- **No classes in alias tags.** Replicant accepts `[::ui/cell.cell-dim ...]`.
-  Here, write `[::ui/cell {:class :cell-dim} ...]`.
-- **`:class` isn't normalized.** Replicant always hands an alias its `:class`
-  as a collection. Here the alias gets whatever the caller wrote.
-- **No `expand-1`.** The tests use `hiccup/expand` with a stand-in for the
-  cell alias, passed in `:aliases`, to keep the cells unexpanded.
+- **`:class` is only normalized for tag classes.** Replicant always hands an
+  alias its `:class` as a collection. Here it's a vector when the alias tag
+  has classes (`[::ui/cell.cell-dim ...]`), and otherwise whatever the caller
+  wrote.
 - **No memoized aliases.** Replicant skips aliases whose arguments haven't
   changed. `prepare` expands all aliases every time the `app` component
   renders, and React still only touches the DOM where something changed.

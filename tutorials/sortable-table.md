@@ -288,9 +288,9 @@ with the opposite order:
 
 ```clojure
 [:th.py-2.text-left.pr-4
- [:ui/a {:class "hover:underline cursor-pointer"
-         :ui/location (assoc-in location [:location/hash-params :sort-order]
-                                (reverse-order sort-order))}
+ [:ui/a.hover:underline.cursor-pointer
+ {:ui/location (assoc-in location [:location/hash-params :sort-order]
+                         (reverse-order sort-order))}
   (if (= "desc" sort-order) "▼" "▲") " Ranking"]]
 ```
 
@@ -622,17 +622,18 @@ Using the alias doesn't change much yet:
         sort-column (get-sort-column location)]
     [:div.p-8.max-w-screen-lg
      ,,,
-     [::st/table
-      {:class "w-full"
-       ::st/location location
+     [::st/table.w-full
+      {::st/location location
        ::st/columns columns}
       ,,,]]))
 ```
 
 `::st/table` is short for `:boardgames.ui.sortable-table/table`: `::` with an
-alias from the `ns` form expands to that namespace. Replicant would also let
-us write the class in the tag, as in `[::st/table.w-full ...]`. Our adapter
-looks up alias tags exactly as written, so classes on an alias go in `:class`.
+alias from the `ns` form expands to that namespace. Like any hiccup tag, an
+alias tag can carry classes: `.w-full` is removed from the tag before the
+alias is looked up, and the alias gets it in its attributes as
+`{:class ["w-full"]}`. The table alias passes its attributes on to the
+`table` element, so that's where the class ends up.
 
 The table alias passes the location, the columns and the sort criteria to
 `thead` and `tbody`. For them to reach the headers, we need our own `thead`
@@ -675,11 +676,10 @@ Again, using it changes little so far:
         sort-column (get-sort-column location)]
     [:div.p-8.max-w-screen-lg
      ,,,
-     [::st/table
-      {:class "w-full"
-       ::st/location location
+     [::st/table.w-full
+      {::st/location location
        ::st/columns columns}
-      [::st/thead {:class "border-b border-gray-200 bg-base-200"}
+      [::st/thead.border-b.border-gray-200.bg-base-200
        [:th.py-2.text-left.px-4
         (render-header-link location (nth columns 0))]
        ,,,]
@@ -722,17 +722,16 @@ function becomes:
         sort-column (get-sort-column location)]
     [:div.p-8.max-w-screen-lg
      [:h1.text-2xl.font-serif.mb-4 "Boardgames ranked by Boardgamegeek"]
-     [::st/table
-      {:class "w-full"
-       ::st/location location
+     [::st/table.w-full
+      {::st/location location
        ::st/columns columns}
-      [::st/thead {:class "border-b border-gray-200 bg-base-200"}
-       [::st/th {:class "py-2 text-left px-4"}]
-       [::st/th {:class "py-2 text-left pr-4"}]
-       [::st/th {:class "py-2 text-left pr-4"}]
-       [::st/th {:class "py-2 whitespace-nowrap text-left pr-4"}]
-       [::st/th {:class "py-2 whitespace-nowrap text-left pr-4"}]
-       [::st/th {:class "py-2 text-right px-4"}]]
+      [::st/thead.border-b.border-gray-200.bg-base-200
+       [::st/th.py-2.text-left.px-4]
+       [::st/th.py-2.text-left.pr-4]
+       [::st/th.py-2.text-left.pr-4]
+       [::st/th.py-2.whitespace-nowrap.text-left.pr-4]
+       [::st/th.py-2.whitespace-nowrap.text-left.pr-4]
+       [::st/th.py-2.text-right.px-4]]
       [:tbody
        (for [game (sort-by (:f sort-column) (st/comparators sort-order) boardgames)]
          [:tr.border-b.border-1.border-gray-200 {:key (:bgg/ranking game)}
@@ -805,30 +804,25 @@ column, and remove `get-sort-column` and the `let` from `boardgames.ui`:
 (defn render-page [{:keys [boardgames]} location]
   [:div.p-8.max-w-screen-lg
    [:h1.text-2xl.font-serif.mb-4 "Boardgames ranked by Boardgamegeek"]
-   [::st/table
-    {:class "w-full"
-     ::st/location location
+   [::st/table.w-full
+    {::st/location location
      ::st/columns columns}
-    [::st/thead {:class "border-b border-gray-200 bg-base-200"}
-     [::st/th {:class "py-2 text-left px-4"}]
-     [::st/th {:class "py-2 text-left pr-4"}]
-     [::st/th {:class "py-2 text-left pr-4"}]
-     [::st/th {:class "py-2 whitespace-nowrap text-left pr-4"}]
-     [::st/th {:class "py-2 whitespace-nowrap text-left pr-4"}]
-     [::st/th {:class "py-2 text-right px-4"}]]
-    [::st/tbody
-     {:class "border-b border-1 border-gray-200"
-      ::st/data boardgames}
-     [::st/td {:class "py-2 px-4 text-left"}]
-     [::st/td {:class "py-2 pr-4 text-left"}]
-     [::st/td {:class "py-2 pr-4 text-center"}]
-     [::st/td {:class "py-2 pr-4 text-left"}]
-     [::st/td {:class "py-2 pr-4 text-left"}]
-     [::st/td {:class "py-2 px-4 text-right"}]]]])
+    [::st/thead.border-b.border-gray-200.bg-base-200
+     [::st/th.py-2.text-left.px-4]
+     [::st/th.py-2.text-left.pr-4]
+     [::st/th.py-2.text-left.pr-4]
+     [::st/th.py-2.whitespace-nowrap.text-left.pr-4]
+     [::st/th.py-2.whitespace-nowrap.text-left.pr-4]
+     [::st/th.py-2.text-right.px-4]]
+    [::st/tbody.border-b.border-1.border-gray-200
+     {::st/data boardgames}
+     [::st/td.py-2.px-4.text-left]
+     [::st/td.py-2.pr-4.text-left]
+     [::st/td.py-2.pr-4.text-center]
+     [::st/td.py-2.pr-4.text-left]
+     [::st/td.py-2.pr-4.text-left]
+     [::st/td.py-2.px-4.text-right]]]])
 ```
-
-Tailwind finds class names in strings as well as in hiccup tags like
-`:div.p-8`, so moving classes into `:class` doesn't affect the CSS.
 
 ## td vs th
 
@@ -860,15 +854,14 @@ And we're back to the exact layout we started with:
 
 ```clojure
 ;; src/boardgames/ui.cljc
-    [::st/tbody
-     {:class "border-b border-1 border-gray-200"
-      ::st/data boardgames}
-     [::st/th {:class "py-2 px-4 text-left"}]     ;; <=====
-     [::st/td {:class "py-2 pr-4 text-left"}]
-     [::st/td {:class "py-2 pr-4 text-center"}]
-     [::st/td {:class "py-2 pr-4 text-left"}]
-     [::st/td {:class "py-2 pr-4 text-left"}]
-     [::st/td {:class "py-2 px-4 text-right"}]]
+    [::st/tbody.border-b.border-1.border-gray-200
+     {::st/data boardgames}
+     [::st/th.py-2.px-4.text-left]     ;; <=====
+     [::st/td.py-2.pr-4.text-left]
+     [::st/td.py-2.pr-4.text-center]
+     [::st/td.py-2.pr-4.text-left]
+     [::st/td.py-2.pr-4.text-left]
+     [::st/td.py-2.px-4.text-right]]
 ```
 
 ## Testing the table
@@ -966,9 +959,6 @@ as an exercise.
 
 - **Aliases** are registered with `hiccup/register-alias!` instead of
   `defalias`, and the alias functions always take two arguments.
-- **No classes in alias tags.** Replicant allows `[::st/th.py-2.text-left]`.
-  Here, classes on an alias go in `:class`: `[::st/th {:class "py-2
-  text-left"}]`.
 - **`update-attrs`** is a small function in `sortable-table`, because
   `datadriven.hiccup` has no equivalent of `replicant.hiccup/update-attrs`.
 - **Row keys** are `(hash row-data)`, because React keys must be strings or

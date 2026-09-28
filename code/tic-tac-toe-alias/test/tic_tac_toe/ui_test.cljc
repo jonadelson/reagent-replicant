@@ -94,6 +94,12 @@
                           :data-cell-id "f6c"}
             nil])))
 
+  (testing "Takes classes in the tag"
+    (is (= (hiccup/expand [::ui/cell.myclass {:data-cell-id "f6c"}])
+           [:button.cell {:class ["myclass"]
+                          :data-cell-id "f6c"}
+            nil])))
+
   (testing "Wraps the content"
     (is (= (hiccup/expand [::ui/cell ui/mark-x])
            [:button.cell {} [:div.cell-content {} ui/mark-x]]))))
