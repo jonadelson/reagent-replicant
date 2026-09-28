@@ -17,9 +17,8 @@
             "▢")]
          (:todo/title item)
          " ("
-         [:ui/a
-          {:class "link"
-           :ui/location
+         [:ui/a.link
+          {:ui/location
            {:location/page-id :pages/user
             :location/params {:user/id (:todo/created-by item)}}}
           (:todo/created-by item)]

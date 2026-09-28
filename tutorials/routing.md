@@ -804,8 +804,11 @@ caring how URLs are spelled:
             "Show description"]))))
 ```
 
-An alias can take other attributes like any element, such as
-`[:ui/a {:class "button" :ui/location ,,,} "Home"]`.
+Remember that an alias works like any other hiccup element: you can put
+classes and an id in the tag, as in `[:ui/a.btn {:ui/location ,,,} "Home"]`,
+and give it any attributes. `prepare` handles the shorthand the same way
+Replicant does: it looks up `:ui/a` and passes `{:class ["btn"]}` along with
+the other attributes, and `routing-anchor` hands them on to the `:a`.
 
 The complete code is in [`code/routing`](../code/routing/).
 
@@ -833,7 +836,5 @@ cover that.
   The original reads only the path.
 - **The alias** is registered with `hiccup/register-alias!` and gets the routes
   from `::hiccup/alias-data`, where Replicant uses `:replicant/alias-data`.
-  Replicant also accepts classes in an alias tag (`:ui/a.button`); with
-  `datadriven.hiccup`, use the `:class` attribute instead.
 - **Clicks are ignored when they aren't on a link.** The original's first
   version passes a missing `href` to the regular expression, which throws.

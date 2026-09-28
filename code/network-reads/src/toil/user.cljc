@@ -15,8 +15,7 @@
      (when user
        [:p.mb-2 (:user/email user)])
      [:p
-      [:ui/a {:class "link"
-              :ui/location {:location/page-id :pages/frontpage}}
+      [:ui/a.link {:ui/location {:location/page-id :pages/frontpage}}
        "Back"]]]))
 
 (def page

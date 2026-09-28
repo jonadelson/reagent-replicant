@@ -674,8 +674,7 @@ Start with a new namespace for the page:
   [:main.p-8.max-w-screen-lg
    [:h1.text-2xl.mb-4 "User " (-> state :location :location/params :user/id)]
    [:p
-    [:ui/a {:class "link"
-            :ui/location {:location/page-id :pages/frontpage}}
+    [:ui/a.link {:ui/location {:location/page-id :pages/frontpage}}
      "Back"]]])
 
 (def page
@@ -722,9 +721,8 @@ Now link to the user page from each todo item on the frontpage:
             "▢")]
          (:todo/title item)
          " ("
-         [:ui/a
-          {:class "link"
-           :ui/location
+         [:ui/a.link
+          {:ui/location
            {:location/page-id :pages/user
             :location/params {:user/id (:todo/created-by item)}}}
           (:todo/created-by item)]
@@ -774,8 +772,7 @@ The render function uses the same `get-query` to find the result:
      (when user
        [:p.mb-2 (:user/email user)])
      [:p
-      [:ui/a {:class "link"
-              :ui/location {:location/page-id :pages/frontpage}}
+      [:ui/a.link {:ui/location {:location/page-id :pages/frontpage}}
        "Back"]]]))
 ```
 

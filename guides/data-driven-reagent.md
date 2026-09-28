@@ -201,6 +201,27 @@ Event names are the DOM's (`:click`, `:input`, `:submit`, `:keydown`,
 `:mouseenter`...). `prepare` knows how React spells the multi-word ones
 (`:keydown` → `:on-key-down`).
 
+### Text fields
+
+Form fields need two extra things to work well in React:
+
+- On `input`, `textarea` and `select` elements, `:on {:input ...}` becomes
+  React's `:on-change`. (React's `onChange` fires on every keystroke, like the
+  DOM's `input` event.) When a field's `:value` comes from app-db, Reagent
+  only keeps the cursor where it belongs if it sees `:on-change`. With
+  `:on-input`, typing in the middle of the text makes the cursor jump to the
+  end.
+- Actions for `:input` and `:change` events use `rf/dispatch-sync` instead of
+  `rf/dispatch`. The event is handled right away, so app-db has the new text
+  before React draws the field again, and fast typists don't lose characters.
+
+So the Replicant style works as is:
+
+```clojure
+[:input {:value (:query state)
+         :on {:input [:store/assoc-in [:query] :event/target.value]}}]
+```
+
 ### Actions are re-frame events
 
 Every action that isn't `:event/prevent-default` or `:event/stop-propagation`
@@ -293,9 +314,18 @@ function that returns hiccup.
 
 `prepare` (and `expand`, which only expands aliases) replaces any element
 whose tag is a namespaced keyword with the result of calling its function with
-the attribute map and the children. The result is itself prepared, so aliases
-can use other aliases. An unknown alias renders as an empty
-`[:div {:data-unknown-alias ":ui/nope"}]` and logs a warning.
+the attribute map and the children (without `nil`s). The result is itself
+prepared, so aliases can use other aliases. An unknown alias renders as an
+empty `[:div {:data-unknown-alias ":ui/nope"}]` and logs a warning.
+
+As with HTML tags, you can add classes and an id in the tag.
+`[:ui/button.primary#save {...}]` calls the `:ui/button` alias with
+`{:class ["primary"] :id "save" ...}`. Classes from the tag go first, then
+any from `:class`.
+
+To test aliases, `expand` expands everything down to plain HTML elements.
+`expand-1` expands aliases in the hiccup you give it, but leaves aliases in
+what those aliases return alone. Use it to test one layer at a time.
 
 ### Why not just call the function?
 
@@ -424,11 +454,12 @@ A cheat sheet for reading the original tutorials side by side with these:
 | `:replicant/on-mount` and friends | `r/create-class` or `:ref` |
 | `:replicant/mounting` | CSS `@starting-style` |
 | `replicant.string/render` | `hiccup/expand` + an HTML renderer (see the server-side alias tutorial) |
+| `replicant.alias/expand-1` | `hiccup/expand-1` |
 | `portfolio.replicant` | `portfolio.reagent-18` with `(pr/set-decorator! hiccup/prepare)` |
 
 ## The full source
 
-The whole of `datadriven.hiccup` is about 200 lines, with tests in
+The whole of `datadriven.hiccup` is about 250 lines, with tests in
 [`lib/test`](../lib/test/datadriven/hiccup_test.cljc). It's meant to be copied
 into your project and changed as you see fit. Every tutorial project has its
 own copy.

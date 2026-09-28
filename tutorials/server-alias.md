@@ -111,7 +111,7 @@ placeholder element, and leaves behind the data the browser will need later:
         (->> (keys attrs)
              (filter (comp #{"atlas.ui.map"} namespace))
              (select-keys attrs)
-             (into {::points (into [] (keep second) children)})))}]]))
+             (into {::points (mapv second children)})))}]]))
 ```
 
 The element keeps the attributes the page gave it (like `:class "mb-4"`), and

@@ -563,8 +563,10 @@ one more thing to take care of.
 
 ### Controlled inputs and asynchronous events
 
-Type something quickly into the field, or hold down a key, and you'll see
-characters go missing. Here's why.
+Type something quickly into the field and some characters go missing. Type
+slowly in the middle of the text, and the cursor jumps to the end after
+every character. (The console also has a React warning about the `value`
+being `null`, which we'll get rid of in passing.) Here's why.
 
 Replicant runs the actions and renders the page again right away, while the
 browser is still handling the keystroke. The field and app-db never disagree.
@@ -574,11 +576,17 @@ re-frame and Reagent work differently:
    after.
 2. Reagent re-renders on the browser's next animation frame.
 
-If a render happens between a keystroke and the handling of its event, the
-field is rendered with the old text from app-db, and the character you just
-typed is gone. Reagent has a safety net for controlled inputs that keeps the
-text and the caret in place, but it only works for `:on-change` handlers that
-update the state right away.
+Meanwhile, React insists that a controlled input shows its `:value`. Right
+after the input event, before re-frame has even seen it, React puts the old
+text back. When the new text finally arrives, it's written into the field
+from the outside, which moves the cursor to the end. And if you type the
+next character before that happens, it's typed into the old text, and the
+previous one is lost.
+
+Reagent has a safety net for controlled inputs that keeps the text and the
+cursor in place, and also turns a `nil` value into an empty string. But it
+only works for `:on-change` handlers, and only if they update the state right
+away.
 
 re-frame's documentation for `dispatch-sync` names exactly this case as one
 of the few where you should use it: "the `:on-change` handler of a text field

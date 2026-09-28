@@ -127,4 +127,4 @@
 
 (hiccup/register-alias! ::marker-map
   (fn [attrs children]
-    [map-component (assoc attrs ::points (into [] (keep second) children))]))
+    [map-component (assoc attrs ::points (mapv second children))]))

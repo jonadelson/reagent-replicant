@@ -33,6 +33,15 @@
     (is (= (hiccup/prepare [:button {:on {:click nil}}])
            [:button {}])))
 
+  (testing "Uses :on-change for input events on form fields, so Reagent keeps the cursor in place"
+    (let [[_ attrs] (hiccup/prepare [:input.big {:value "x" :on {:input [:x]}}])]
+      (is (fn? (:on-change attrs)))
+      (is (nil? (:on-input attrs)))))
+
+  (testing "Keeps :on-input on other elements"
+    (let [[_ attrs] (hiccup/prepare [:div {:content-editable true :on {:input [:x]}}])]
+      (is (fn? (:on-input attrs)))))
+
   (testing "Drops namespaced attributes"
     (is (= (hiccup/prepare [:div {:ui/size :large :id "x"}])
            [:div {:id "x"}])))
@@ -69,6 +78,30 @@
     (is (= (hiccup/expand [:ui/button {:key "save"} "Save"]
                           {:aliases {:ui/button render-button}})
            [:button.btn {:key "save"} "Save"])))
+
+  (testing "Adds classes and id from the alias tag"
+    (is (= (hiccup/expand [:ui/button.primary.large#save {:class "x"} "Save"]
+                          {:aliases {:ui/button (fn [attrs children]
+                                                  (into [:button (select-keys attrs [:class :id])] children))}})
+           [:button {:class ["primary" "large" "x"] :id "save"} "Save"])))
+
+  (testing "Leaves nil children out"
+    (is (= (hiccup/expand [:ui/button nil "Save" (when false "!")]
+                          {:aliases {:ui/button render-button}})
+           [:button.btn {} "Save"])))
+
+  (testing "Puts the key on components returned by aliases"
+    (let [component (fn [_])
+          result (hiccup/expand [:ui/map {:key "m"}]
+                                {:aliases {:ui/map (fn [attrs _] [component attrs])}})]
+      (is (= "m" (:key (meta result))))))
+
+  (testing "expand-1 only expands one level"
+    (is (= (hiccup/expand-1 [:div [:ui/panel "Save"]]
+                            {:aliases {:ui/button render-button
+                                       :ui/panel (fn [_ children]
+                                                   [:div.panel (into [:ui/button] children)])}})
+           [:div {} [:div.panel [:ui/button "Save"]]])))
 
   (testing "expand keeps event handler data"
     (is (= (hiccup/expand [:button {:on {:click [:save]}}])

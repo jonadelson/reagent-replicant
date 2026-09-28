@@ -21,7 +21,7 @@ uses as it goes.
    and introduces the whole workflow: UI elements in isolation, pure domain
    logic, domain data → UI data, and wiring it together with re-frame.
 2. [Data-driven Reagent](guides/data-driven-reagent.md) is a guide to the ideas
-   behind all the tutorials, and to the ~200 lines of code that make them work
+   behind all the tutorials, and to the ~250 lines of code that make them work
    in Reagent (`datadriven.hiccup`). It ends with a Replicant → re-frame cheat
    sheet.
 

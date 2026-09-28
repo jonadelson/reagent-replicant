@@ -479,9 +479,10 @@ Some things to note:
   without knowing which ones they are.
 - `::map/marker` doesn't need to be an alias. The map alias receives the
   markers as its children, and just takes the attribute map out of each one.
-- `prepare` hands the alias a flat list of children: lists (like the result
-  of `for`) are spliced in. Unlike Replicant, it does not remove `nil`
-  children, so the alias skips them itself.
+- `prepare` tidies up the children before calling the alias, like Replicant
+  does: lists (like the result of `for`) are spliced in, and `nil`s are
+  removed. So this works even with a `(when ...)` between markers, or
+  markers nested in a list.
 
 Here is the alias. It registers a function for `::marker-map` that returns
 our component, with the points added to its data:
@@ -489,7 +490,7 @@ our component, with the points added to its data:
 ```clojure
 (hiccup/register-alias! ::marker-map
   (fn [attrs children]
-    [map-component (assoc attrs ::points (into [] (keep second) children))]))
+    [map-component (assoc attrs ::points (mapv second children))]))
 ```
 
 An alias usually expands to plain hiccup. This one expands to
@@ -677,8 +678,6 @@ applies.
 - `atlas.ui` requires `atlas.ui.map` with `:as-alias`, and `atlas.core`
   loads the implementation. That keeps the page loadable on the JVM, so it
   has tests.
-- `prepare` doesn't remove `nil` children before calling an alias, so the
-  alias uses `keep`.
 - Small fixes: `load-marker` only adds the image when loading succeeded, and
   the Mapbox expression is written with strings (`["get" "label"]`) instead
   of symbols.

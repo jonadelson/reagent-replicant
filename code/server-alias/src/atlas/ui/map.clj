@@ -16,4 +16,4 @@
         (->> (keys attrs)
              (filter (comp #{"atlas.ui.map"} namespace))
              (select-keys attrs)
-             (into {::points (into [] (keep second) children)})))}]]))
+             (into {::points (mapv second children)})))}]]))

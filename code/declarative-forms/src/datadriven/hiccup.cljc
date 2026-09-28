@@ -52,21 +52,25 @@
 ;; handled right away, because they need the live DOM event. Everything else
 ;; is plain data and goes to re-frame.
 
-(defn- execute-action! [dom-event [id :as action]]
+(defn- execute-action! [dom-event [id :as action] {:keys [sync?]}]
   (case id
     :event/prevent-default #?(:cljs (.preventDefault dom-event) :clj nil)
     :event/stop-propagation #?(:cljs (.stopPropagation dom-event) :clj nil)
-    (rf/dispatch action)))
+    (if sync?
+      (rf/dispatch-sync action)
+      (rf/dispatch action))))
 
 (defn dispatch-actions
   "Runs the actions for one DOM event: fills in placeholders, then executes
-  each action in order."
-  [dom-event actions]
-  (let [actions (if (keyword? (first actions))
-                  [actions] ;; A single action, like [:tic 0 1]
-                  actions)]
-    (doseq [action (interpolate dom-event (remove nil? actions))]
-      (execute-action! dom-event action))))
+  each action in order. With `{:sync? true}`, events are handled right away
+  (`rf/dispatch-sync`) instead of being queued."
+  ([dom-event actions] (dispatch-actions dom-event actions nil))
+  ([dom-event actions opts]
+   (let [actions (if (keyword? (first actions))
+                   [actions] ;; A single action, like [:tic 0 1]
+                   actions)]
+     (doseq [action (interpolate dom-event (remove nil? actions))]
+       (execute-action! dom-event action opts)))))
 
 ;;; Aliases
 
@@ -110,22 +114,39 @@
    :transitionend :on-transition-end
    :animationend :on-animation-end})
 
-(defn- event-prop [event]
+(defn- tag-name
+  "The element name of a hiccup tag: :input.big#name -> \"input\""
+  [tag]
+  (re-find #"^[^.#]+" (name tag)))
+
+(def ^:private form-fields #{"input" "textarea" "select"})
+
+(defn- event-prop [tag event]
   (or (react-event-props event)
+      ;; React's onChange on form fields fires on every keystroke, just like
+      ;; the DOM's input event. Reagent needs onChange (not onInput) to keep
+      ;; the cursor in place when a field's :value comes from app-db.
+      (when (and (= :input event) (form-fields (tag-name tag)))
+        :on-change)
       (keyword (str "on-" (name event)))))
 
-(defn- event-handler [handler]
+;; Typing must update app-db before the browser draws the next frame, or
+;; fast typists lose characters. Other events can wait in re-frame's queue.
+(def ^:private sync-events #{:input :change})
+
+(defn- event-handler [event handler]
   (if (fn? handler)
     handler
-    (fn [e] (dispatch-actions e handler))))
+    (let [opts {:sync? (contains? sync-events event)}]
+      (fn [e] (dispatch-actions e handler opts)))))
 
-(defn- prepare-attrs [attrs]
+(defn- prepare-attrs [tag attrs]
   (let [{:keys [on innerHTML]} attrs]
     (cond-> (into {} (remove (comp qualified-keyword? key)) (dissoc attrs :on :innerHTML))
       innerHTML (assoc :dangerouslySetInnerHTML {:__html innerHTML})
       on (into (for [[event handler] on
                      :when handler]
-                 [(event-prop event) (event-handler handler)])))))
+                 [(event-prop tag event) (event-handler event handler)])))))
 
 ;;; Walking the hiccup
 
@@ -144,22 +165,48 @@
 (declare walk-hiccup)
 
 (defn- add-key [hiccup k]
-  (if (and k (vector? hiccup) (keyword? (first hiccup)))
+  (cond
+    (not (and k (vector? hiccup)))
+    hiccup
+
+    (keyword? (first hiccup))
     (let [[tag attrs children] (parse-node hiccup)]
       (into [tag (assoc attrs :key k)] children))
-    hiccup))
+
+    ;; A Reagent component, like [map-component props]
+    :else
+    (vary-meta hiccup assoc :key k)))
+
+(defn- class-coll [class]
+  (cond
+    (nil? class) []
+    (coll? class) (vec class)
+    :else [class]))
+
+(defn- parse-alias-tag
+  "Splits :ui/button.primary#save into the alias :ui/button and the classes
+  and id to add to its attributes."
+  [tag attrs]
+  (let [[base & shorthand] (re-seq #"[.#]?[^.#]+" (name tag))
+        classes (keep #(when (= \. (first %)) (subs % 1)) shorthand)
+        id (some #(when (= \# (first %)) (subs % 1)) shorthand)]
+    [(keyword (namespace tag) base)
+     (cond-> attrs
+       (seq classes) (assoc :class (into (vec classes) (class-coll (:class attrs))))
+       (and id (not (:id attrs))) (assoc :id id))]))
 
 (defn- expand-alias [tag attrs children opts]
-  (if-let [f (get (merge @aliases (:aliases opts)) tag)]
-    (-> (f (cond-> attrs
-             (:alias-data opts) (assoc ::alias-data (:alias-data opts)))
-           (flatten-children children))
-        (add-key (:key attrs))
-        (walk-hiccup opts))
-    (do
-      #?(:cljs (js/console.warn "Unknown alias" (str tag))
-         :clj nil)
-      [:div {:data-unknown-alias (str tag)}])))
+  (let [[alias attrs] (parse-alias-tag tag attrs)]
+    (if-let [f (get (merge @aliases (:aliases opts)) alias)]
+      (cond-> (-> (f (cond-> attrs
+                       (:alias-data opts) (assoc ::alias-data (:alias-data opts)))
+                     (remove nil? (flatten-children children)))
+                  (add-key (:key attrs)))
+        (not (::once? opts)) (walk-hiccup opts))
+      (do
+        #?(:cljs (js/console.warn "Unknown alias" (str alias))
+           :clj nil)
+        [:div {:data-unknown-alias (str alias)}]))))
 
 (defn- walk-hiccup [node opts]
   (cond
@@ -168,7 +215,7 @@
       (if (qualified-keyword? tag)
         (expand-alias tag attrs children opts)
         (with-meta
-          (into [tag (cond-> attrs (:reagent? opts) prepare-attrs)]
+          (into [tag (cond->> attrs (:reagent? opts) (prepare-attrs tag))]
                 (map #(walk-hiccup % opts))
                 (flatten-children children))
           (meta node))))
@@ -190,6 +237,14 @@
   ([hiccup] (expand hiccup nil))
   ([hiccup opts]
    (walk-hiccup hiccup (dissoc opts :reagent?))))
+
+(defn expand-1
+  "Like `expand`, but does not expand aliases in the hiccup that aliases
+  return. Useful for testing one alias, or a view that uses aliases, without
+  also testing every alias underneath."
+  ([hiccup] (expand-1 hiccup nil))
+  ([hiccup opts]
+   (walk-hiccup hiccup (-> opts (dissoc :reagent?) (assoc ::once? true)))))
 
 (defn prepare
   "Turns data-driven hiccup into hiccup that Reagent can render: expands
