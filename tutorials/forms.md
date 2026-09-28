@@ -575,7 +575,7 @@ the keystroke has reached app-db, React puts the old text back. Typing fast
 then loses characters, and typing in the middle of the text makes the cursor
 jump to the end.
 
-`datadriven.hiccup` takes care of this for you, in two ways:
+`datadriven.hiccup` takes care of this for you, in three ways:
 
 - Actions for `:input` and `:change` events are dispatched with
   `rf/dispatch-sync`, which handles the event immediately instead of
@@ -598,8 +598,8 @@ jump to the end.
 
 So the view can stay exactly as the original writes it, and the event handler
 remains plain data. If you write your own event handlers in Reagent (as
-functions), remember the combination: `:on-change` plus `rf/dispatch-sync`
-for controlled text fields. Together, these three tricks give the input
+functions), remember the combination: `:on-change`, `rf/dispatch-sync` and
+`r/flush` for controlled text fields. Together, these three tricks give the input
 events Replicant's behavior: state changes and rendering happen before the
 browser moves on.
 
