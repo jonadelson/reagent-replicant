@@ -2,95 +2,135 @@
   (:require [clojure.test :refer [deftest is testing]]
             [toil.forms :as forms]))
 
-(deftest keyword->s-test
-  (is (= (forms/keyword->s :task/name) "task/name"))
-  (is (= (forms/keyword->s :name) "name"))
-  (is (= (keyword (forms/keyword->s :task/name)) :task/name)))
+(deftest validate-form-data-test
+  (testing "Validates required field"
+    (is (= (forms/validate-form-data
+            {:form/id :forms/test-form
+             :form/fields
+             [{:k :task/name
+               :validations [{:validation/kind :required}]}]}
+            {:task/name nil})
+           [{:validation-error/field :task/name
+             :validation-error/message "Please type in some text"}])))
 
-(deftest update-attrs-test
-  (testing "Updates existing attributes"
-    (is (= (forms/update-attrs [:input {:type "text"}] assoc :id "x")
-           [:input {:type "text" :id "x"}])))
+  (testing "Empty strings do not satisfy requiredness"
+    (is (= (forms/validate-form-data
+            {:form/id :forms/test-form
+             :form/fields
+             [{:k :task/name
+               :validations [{:validation/kind :required}]}]}
+            {:task/name ""})
+           [{:validation-error/field :task/name
+             :validation-error/message "Please type in some text"}])))
 
-  (testing "Adds attributes to elements without them"
-    (is (= (forms/update-attrs [:h1 "Hi!"] assoc :class "title")
-           [:h1 {:class "title"} "Hi!"]))))
+  (testing "Validates required field with custom message"
+    (is (= (forms/validate-form-data
+            {:form/id :forms/test-form
+             :form/fields
+             [{:k :task/name
+               :validations [{:validation/kind :required
+                              :validation/message "Oh no!"}]}]}
+            {:task/name nil})
+           [{:validation-error/field :task/name
+             :validation-error/message "Oh no!"}])))
 
-(deftest text-input-test
-  (is (= (forms/text-input {:task/duration 15} :task/duration {:type "number"})
-         [:input.grow.input.input-bordered
-          {:type "number"
-           :name "task/duration"
-           :id "task/duration"
-           :default-value 15}])))
+  (testing "Passes validation for required field"
+    (is (= (forms/validate-form-data
+            {:form/id :forms/test-form
+             :form/fields
+             [{:k :task/name
+               :validations [{:validation/kind :required
+                              :validation/message "Oh no!"}]}]}
+            {:task/name "I'm ok!"})
+           [])))
 
-(deftest select-test
-  (is (= (forms/select {:task/priority :task.priority/low} :task/priority
-                       [{:value :task.priority/high :label "High"}
-                        {:value :task.priority/low :label "Low"}])
-         [:select.grow.select.select-bordered
-          {:name "task/priority"
-           :id "task/priority"
-           :default-value "task.priority/low"
-           :data-type "keyword"}
-          [[:option {:value "task.priority/high"} "High"]
-           [:option {:value "task.priority/low"} "Low"]]])))
+  (testing "Validates max number field"
+    (is (= (forms/validate-form-data
+            {:form/id :forms/test-form
+             :form/fields
+             [{:k :task/duration
+               :validations [{:validation/kind :max-num
+                              :max 60}]}]}
+            {:task/duration 65})
+           [{:validation-error/field :task/duration
+             :validation-error/message "Should be max 60"}])))
 
-(deftest input-field-test
-  (testing "Renders label and field"
-    (is (= (forms/input-field nil "Task" {:task/name "Scales"} :task/name forms/text-input)
-           [[:div.flex.items-center
-             [:label.basis-24 {:for "task/name"} "Task"]
-             [:input.grow.input.input-bordered
-              {:type "text"
-               :name "task/name"
-               :id "task/name"
-               :default-value "Scales"}]]
-            nil])))
+  (testing "Validates max number with custom message"
+    (is (= (forms/validate-form-data
+            {:form/id :forms/test-form
+             :form/fields
+             [{:k :task/duration
+               :validations [{:validation/kind :max-num
+                              :validation/message "I don't think so"
+                              :max 60}]}]}
+            {:task/duration 65})
+           [{:validation-error/field :task/duration
+             :validation-error/message "I don't think so"}])))
 
-  (testing "Renders validation error, and validates again on input"
-    (let [form {:form/id [:forms/edit-task 1]
-                :form/validation-errors
-                [{:validation-error/field :task/name
-                  :validation-error/message "Please type in some text"}]}
-          [field error] (forms/input-field form "Task" {} :task/name forms/text-input)
-          attrs (second (nth field 2))]
-      (is (= (:class attrs) ["input-error"]))
-      (is (= (-> attrs :on :input)
-             [:form/validate [:forms/edit-task 1] :event/form-data]))
-      (is (= error
-             [:div.validator-hint.text-error.ml-24.-m-2.mb-2
-              "Please type in some text"])))))
+  (testing "Passes max validation"
+    (is (= (forms/validate-form-data
+            {:form/id :forms/test-form
+             :form/fields
+             [{:k :task/duration
+               :validations [{:validation/kind :max-num
+                              :max 60}]}]}
+            {:task/duration 55})
+           []))))
 
-(deftest validate-edit-task-test
-  (is (= (forms/validate-edit-task {:task/name "Scales" :task/duration 15})
-         []))
-  (is (= (forms/validate-edit-task {:task/name "" :task/duration 61})
-         [{:validation-error/field :task/name
-           :validation-error/message "Please type in some text"}
-          {:validation-error/field :task/duration
-           :validation-error/message "Duration can not exceed 60 minutes"}])))
+(deftest validate-test
+  (testing "Stores the validation errors for the form"
+    (is (= (forms/validate
+            {:form/id [:forms/test-form 1]
+             :form/fields
+             [{:k :task/name
+               :validations [{:validation/kind :required}]}]}
+            {:task/name ""})
+           [[:store/assoc-in [:forms [:forms/test-form 1]]
+             {:form/id [:forms/test-form 1]
+              :form/validation-errors
+              [{:validation-error/field :task/name
+                :validation-error/message "Please type in some text"}]}]]))))
 
-(deftest validate-edit-task-form-test
-  (is (= (forms/validate-edit-task-form [:forms/edit-task 1] {:task/name "Scales"})
-         [[:store/assoc-in [:forms [:forms/edit-task 1]]
-           {:form/id [:forms/edit-task 1]
-            :form/validation-errors []}]])))
-
-(deftest submit-edit-task-test
-  (testing "Stores validation errors"
-    (is (= (forms/submit-edit-task :forms/edit-task 1 {:task/name ""})
-           [[:store/assoc-in [:forms [:forms/edit-task 1]]
-             {:form/id [:forms/edit-task 1]
+(deftest submit-test
+  (testing "Validates form"
+    (is (= (forms/submit
+            {:form/id [:forms/test-form 1]
+             :form/fields
+             [{:k :task/name
+               :validations [{:validation/kind :required}]}]}
+            {:task/name nil}
+            1)
+           [[:store/assoc-in [:forms [:forms/test-form 1]]
+             {:form/id [:forms/test-form 1]
               :form/validation-errors
               [{:validation-error/field :task/name
                 :validation-error/message "Please type in some text"}]}]])))
 
-  (testing "Saves the task, closes the form and cleans up the form state"
-    (is (= (forms/submit-edit-task :forms/edit-task 1 {:task/name "Scales"
-                                                       :task/duration 15})
-           [[:store/merge-in [:tasks 1]
-             {:task/name "Scales"
-              :task/duration 15
-              :task/editing? false}]
-            [:store/dissoc-in [:forms [:forms/edit-task 1]]]]))))
+  (testing "Calls form handler when form is valid, then cleans up"
+    (is (= (forms/submit
+            {:form/id [:forms/test-form 1]
+             :form/handler (fn [data task-id]
+                             [[:store/merge-in [:tasks task-id] data]])}
+            {:task/name "Do it!"}
+            1)
+           [[:store/merge-in [:tasks 1] {:task/name "Do it!"}]
+            [:store/dissoc-in [:forms [:forms/test-form 1]]]])))
+
+  (testing "Cleans up form even when the handler has no actions"
+    (is (= (forms/submit
+            {:form/id [:forms/test-form 1]
+             :form/handler (fn [_ _] [])}
+            {:task/name "Do it!"}
+            1)
+           [[:store/dissoc-in [:forms [:forms/test-form 1]]]])))
+
+  (testing "Uses submit actions, with the form data in place of :event/form-data"
+    (is (= (forms/submit
+            {:form/id [:forms/test-form 1]
+             :form/submit-actions [[:store/save [:event/form-data]]]}
+            {:task/id 1
+             :task/name "Do it!"}
+            1)
+           [[:store/save [{:task/id 1
+                           :task/name "Do it!"}]]
+            [:store/dissoc-in [:forms [:forms/test-form 1]]]]))))

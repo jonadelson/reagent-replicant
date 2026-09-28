@@ -18,7 +18,7 @@
              {:query/status :query.status/loading
               :query/user-time now}))
 
-(defn ^{:indent 2} receive-response [state now query response]
+(defn receive-response [state now query response]
   (update-in state [::log query] add-log-entry
              (cond-> {:query/status (if (:success? response)
                                       :query.status/success

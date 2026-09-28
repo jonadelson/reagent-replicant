@@ -8,7 +8,7 @@
              {:command/status :command.status/issued
               :command/user-time now}))
 
-(defn ^{:indent 2} receive-response [state now command response]
+(defn receive-response [state now command response]
   (update-in state [::log command] add-log-entry
              (cond-> {:command/status (if (:success? response)
                                         :command.status/success

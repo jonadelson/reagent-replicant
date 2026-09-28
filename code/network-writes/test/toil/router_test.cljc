@@ -18,6 +18,9 @@
            {:location/page-id :pages/user
             :location/params {:user/id "alice"}})))
 
+  (testing "Does not route unknown URLs"
+    (is (nil? (router/url->location routes "/nope"))))
+
   (testing "Finds the URL of a location"
     (is (= (router/location->url routes
              {:location/page-id :pages/user

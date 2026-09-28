@@ -13,6 +13,9 @@
              {:location/page-id :pages/frontpage})
            "/")))
 
+  (testing "Does not route unknown URLs"
+    (is (nil? (router/url->location router/routes "/nope"))))
+
   (testing "Keeps query parameters"
     (is (= (router/url->location router/routes "/?filter=done")
            {:location/page-id :pages/frontpage

@@ -83,7 +83,10 @@ that shows "Hello". `deps.edn` includes m1p, and
 `src/datadriven/hiccup.cljc` is the full adapter from
 [`lib/`](../lib/src/datadriven/hiccup.cljc). `src/reagent_i18n/core.cljs`
 has the usual wiring: an `:app/init` event that puts `{:locale :en}` in
-app-db, and an `app` component that renders the UI with `prepare`. Also start
+app-db, and an `app` component that renders the UI with `prepare`.
+`dev/reagent_i18n/dev.cljs` registers app-db with
+[Dataspex](https://github.com/cjohansen/dataspex), whose browser extension
+shows it in the developer tools. Also start
 a Clojure REPL, from your editor or with `clojure -M:dev` in a terminal. The
 namespaces we write are `.cljc` files, which work both in the browser and on
 the JVM, so we can try them in the REPL.
@@ -324,9 +327,35 @@ Now the hiccup doesn't mention the locale at all:
 This is a big improvement. Views talk about texts in the abstract ("the page
 title") and don't need to know which language the user reads.
 
+Update the test to match. It no longer passes a locale in the hiccup, only in
+the alias data:
+
+```clojure
+;; test/reagent_i18n/i18n_test.cljc
+(deftest k-test
+  (testing "Looks up a key in the current locale"
+    (is (= (hiccup/expand [:h1 [::i18n/k :page/title]]
+                          {:alias-data {:dictionaries dictionaries
+                                        :locale :nb}})
+           [:h1 {} "Velkommen!"]))
+
+    (is (= (hiccup/expand [:h1 [::i18n/k :page/title]]
+                          {:alias-data {:dictionaries dictionaries
+                                        :locale :en}})
+           [:h1 {} "Welcome!"])))
+
+  (testing "Interpolates parameters"
+    (is (= (hiccup/expand [:p [::i18n/k :user/greeting {:user/given-name "Christian"}]]
+                          {:alias-data {:dictionaries dictionaries
+                                        :locale :en}})
+           [:p {} "Nice to see you, Christian!"]))))
+```
+
 The current locale is application state, so it lives in app-db. The setup
-already puts `:locale :en` there. A subscription reads it, and `app` passes it
-on as alias data:
+already puts `:locale :en` there. Replace the `:app/state` subscription in
+`core.cljs` with one that reads the locale, and have `app` pass it on as alias
+data. `render-ui` no longer needs the state, so for now we give it a
+hard-coded user:
 
 ```clojure
 ;; src/reagent_i18n/core.cljs
@@ -334,12 +363,20 @@ on as alias data:
   (fn [db _]
     (:locale db)))
 
+(defn render-ui [user]
+  [:div
+   [:h1 [::i18n/k :page/title]]
+   [:p [::i18n/k :user/greeting user]]])
+
 (defn app []
   (hiccup/prepare
    (render-ui {:user/given-name "Christian"})
    {:alias-data {:dictionaries dictionaries
                  :locale @(rf/subscribe [:locale])}}))
 ```
+
+`render-ui` passes the user map as the parameters for `:user/greeting`, so
+`{{:user/given-name}}` is filled in from it.
 
 What does this cost? The locale is now an input to the UI that doesn't show
 up in any view function's arguments. When it changes, the `:locale`
@@ -475,15 +512,9 @@ handler flips the locale in app-db:
   (render))
 ```
 
-`render-ui` passes the user map as the parameters for `:user/greeting`, so
-`{{:user/given-name}}` is filled in from it. `rf/dispatch-sync` runs the
-`:app/init` event right away, so the locale is in app-db before the first
-render.
-
-The finished test,
-[`i18n_test.cljc`](../code/i18n-alias/test/reagent_i18n/i18n_test.cljc),
-checks the implicit locale in both languages, and that parameters are filled
-in.
+`rf/dispatch-sync` runs the `:app/init` event right away, so the locale is
+in app-db before the first render. Click the button, and the page switches
+between English and Norwegian.
 
 ## What's different from the Replicant version
 

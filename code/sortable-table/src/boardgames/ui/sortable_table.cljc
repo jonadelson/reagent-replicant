@@ -39,6 +39,8 @@
            ::sort-column (get-sort-column (::location attrs) (::columns attrs)))
          children)))
 
+(hiccup/register-alias! ::table render-table)
+
 (defn render-thead [attrs children]
   [:thead
    (into
@@ -52,6 +54,8 @@
         ::sort-order (::sort-order attrs)
         ::sort-column (::sort-column attrs)))
      children))])
+
+(hiccup/register-alias! ::thead render-thead)
 
 (defn render-tbody [{::keys [columns sort-column sort-order data] :as attrs} children]
   (into
@@ -69,6 +73,8 @@
                      ::data row-data))
                   children)))))))
 
+(hiccup/register-alias! ::tbody render-tbody)
+
 (defn render-th [{::keys [column sort-column sort-order location data] :as attrs} _]
   (if data
     [:th attrs ((:f column) data)]
@@ -84,11 +90,9 @@
         (if (= "desc" sort-order) "▼ " "▲ "))
       (:label column)]]))
 
+(hiccup/register-alias! ::th render-th)
+
 (defn render-td [{::keys [column data] :as attrs} _]
   [:td attrs ((:f column) data)])
 
-(hiccup/register-alias! ::table render-table)
-(hiccup/register-alias! ::thead render-thead)
-(hiccup/register-alias! ::tbody render-tbody)
-(hiccup/register-alias! ::th render-th)
 (hiccup/register-alias! ::td render-td)

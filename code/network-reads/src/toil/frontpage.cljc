@@ -34,7 +34,7 @@
 
 (def page
   {:page-id :pages/frontpage
-   :route []
+   :route [[]]
    :on-load (fn [_location]
               [[:data/query items-query]])
    :render #'render})
