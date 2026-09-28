@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Verifies every project in code/: the adapter copy is identical to lib/,
+# every shadow-cljs build compiles without warnings, and the tests pass.
+#
+# Usage: bin/check [project ...]    (defaults to all projects)
+set -uo pipefail
+cd "$(dirname "$0")/.."
+root=$(pwd)
+failed=()
+
+echo "== lib"
+(cd lib && clojure -M:dev -m kaocha.runner) || failed+=("lib tests")
+
+projects=("$@")
+if [ ${#projects[@]} -eq 0 ]; then
+  projects=($(ls code))
+fi
+
+for p in "${projects[@]}"; do
+  dir="$root/code/$p"
+  echo "== $p"
+  cd "$dir"
+
+  if [ "$p" != "tic-tac-toe" ] && [ -f src/datadriven/hiccup.cljc ]; then
+    cmp -s src/datadriven/hiccup.cljc "$root/lib/src/datadriven/hiccup.cljc" \
+      || failed+=("$p: datadriven/hiccup.cljc differs from lib/")
+  fi
+
+  [ -d node_modules ] || npm install --silent || failed+=("$p: npm install")
+
+  builds=$(clojure -M -e "(println (clojure.string/join \" \" (map name (keys (:builds (clojure.edn/read-string (slurp \"shadow-cljs.edn\")))))))" 2>/dev/null | tail -1)
+  out=$(npx shadow-cljs compile $builds 2>&1)
+  echo "$out" | grep -E "Build (completed|failure)|WARNING" 
+  if echo "$out" | grep -q -E "Build failure|WARNING|[1-9][0-9]* warnings"; then
+    failed+=("$p: shadow-cljs compile")
+  fi
+
+  if [ -d test ]; then
+    clojure -M:dev -m kaocha.runner 2>&1 | tail -1
+    [ "${PIPESTATUS[0]}" -eq 0 ] || failed+=("$p: tests")
+  fi
+done
+
+if [ ${#failed[@]} -eq 0 ]; then
+  echo "All good."
+else
+  printf 'FAILED: %s\n' "${failed[@]}"
+  exit 1
+fi

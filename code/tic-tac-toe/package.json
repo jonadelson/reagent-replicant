@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "shadow-cljs": "3.5.3",
+    "snabbdom": "3.6.2"
+  }
+}
